@@ -18,16 +18,14 @@
 
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.android.bluetoothlegatt"
+    package="cn.way.bleusage"
     android:versionCode="1"
     android:versionName="1.0">
 
-    <!-- Min/target SDK versions (<uses-sdk>) managed by build.gradle -->
+    <uses-sdk
+        android:minSdkVersion="15"
+        android:targetSdkVersion="21" />
     
-    <!-- Declare this required feature if you want to make the app available to BLE-capable
-    devices only.  If you want to make your app available to devices that don't support BLE,
-    you should omit this in the manifest.  Instead, determine BLE capability by using
-    PackageManager.hasSystemFeature(FEATURE_BLUETOOTH_LE) -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true"/>
 
     <uses-permission android:name="android.permission.BLUETOOTH"/>

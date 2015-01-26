@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.example.android.bluetoothlegatt;
+package cn.way.bleusage;
 
 import java.util.HashMap;
 
