@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical" >
+    <LinearLayout 
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#888"
+        android:orientation="vertical">
+<!--         <Button android:id="@+id/discoverableBtn"  -->
+<!--             android:layout_width="match_parent" -->
+<!--             android:layout_height="match_parent" -->
+<!--             android:text="可被查找 " -->
+<!--             android:layout_weight="1"/> -->
+        <Button android:id="@+id/searchBtn" 
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="  查找    "/>
+        <Button android:id="@+id/demoPage" 
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="  DEMO    "/>
+    </LinearLayout>
+
+    <ListView android:id="@+id/im_discoveries_list"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#88f"/>
+</LinearLayout>
