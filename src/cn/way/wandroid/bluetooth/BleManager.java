@@ -1,17 +1,20 @@
 package cn.way.wandroid.bluetooth;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Hashtable;
-import java.util.UUID;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattServer;
 import android.bluetooth.BluetoothGattServerCallback;
-import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothProfile;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -20,11 +23,12 @@ import android.content.pm.PackageManager;
 import android.os.Handler;
 
 /**
- * 1.add permissions. 
- * <uses-permission android:name="android.permission.BLUETOOTH" /> 
- * <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
- * 2.declare the ble feature
- * <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
+ * 1.add permissions. <uses-permission
+ * android:name="android.permission.BLUETOOTH" /> <uses-permission
+ * android:name="android.permission.BLUETOOTH_ADMIN" /> 2.declare the ble
+ * feature <uses-feature android:name="android.hardware.bluetooth_le"
+ * android:required="true" />
+ * 
  * @author Wayne
  */
 public class BleManager {
@@ -33,9 +37,9 @@ public class BleManager {
 	private static BleManager manager;
 
 	public static BleManager instance(Context context)
-			throws BleSupportException {
-		if (!BleManager.isBleSupported(context)) {
-			throw new BleSupportException();
+			throws BleAvailableException {
+		if (!BleManager.isBleAvailable(context)) {
+			throw new BleAvailableException();
 		}
 		if (context == null) {
 			return null;
@@ -46,12 +50,13 @@ public class BleManager {
 		return manager;
 	}
 
-	public static boolean isBleSupported(Context context) {
-		//判断设备支持BLE
-		if (!context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
+	public static boolean isBleAvailable(Context context) {
+		// 判断设备支持BLE
+		if (!context.getPackageManager().hasSystemFeature(
+				PackageManager.FEATURE_BLUETOOTH_LE)) {
 			return false;
 		}
-		//尝试获取蓝牙适配器实例
+		// 尝试获取蓝牙适配器实例
 		BluetoothAdapter mBluetoothAdapter = getBluetoothAdapter(context);
 		if (mBluetoothAdapter == null) {
 			return false;
@@ -59,16 +64,20 @@ public class BleManager {
 			return true;
 		}
 	}
-	public static BluetoothManager getBluetoothManager(Context context){
-		return (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
+
+	public static BluetoothManager getBluetoothManager(Context context) {
+		return (BluetoothManager) context
+				.getSystemService(Context.BLUETOOTH_SERVICE);
 	}
-	public static BluetoothAdapter getBluetoothAdapter(Context context){
+
+	public static BluetoothAdapter getBluetoothAdapter(Context context) {
 		BluetoothManager bluetoothManager = getBluetoothManager(context);
-		if (bluetoothManager!=null) {
+		if (bluetoothManager != null) {
 			return bluetoothManager.getAdapter();
 		}
 		return null;
 	}
+
 	public static boolean isBluetoothEnabled() {
 		BluetoothAdapter mBluetoothAdapter = BluetoothAdapter
 				.getDefaultAdapter();
@@ -109,18 +118,13 @@ public class BleManager {
 	}
 
 	// //////////////////////////////////////////////////////////////////////////////////////////
-	
-	private BluetoothAdapter mBluetoothAdapter;
+
 	private Context context;
 	private DeviceStateListener deviceStateListener;
-	
+
 	public void release() {
 		scanListener = null;
-		// Make sure we're not doing discovery anymore
-		stopScan();
-		// Unregister broadcast listeners
-		if (this.context != null && mReceiver != null)
-			this.context.unregisterReceiver(mReceiver);
+		unregisterBroadcast();
 	}
 
 	/**
@@ -128,21 +132,65 @@ public class BleManager {
 	 */
 	private BleManager(Context context) {
 		super();
+		this.context = context;
 		// 监听蓝牙设置的开关状态
-		IntentFilter filter = new IntentFilter(
-				BluetoothAdapter.ACTION_STATE_CHANGED);
-		context.registerReceiver(mReceiver, filter);
-
-		mBluetoothAdapter = getBluetoothAdapter(context);
+		registerBroadcast();
 	}
-//	public interface Pauseable{
+	private IntentFilter intentFilterStateChanged ;
+	private void registerBroadcast(){
+		if (this.context==null) {
+			return;
+		}
+		
+		if (intentFilterStateChanged == null) {
+			intentFilterStateChanged = new IntentFilter(
+					BluetoothAdapter.ACTION_STATE_CHANGED);
+		}
+		if (mReceiver==null) {
+			mReceiver = new BroadcastReceiver() {
+				@Override
+				public void onReceive(Context context, Intent intent) {
+					if (isPaused) {
+						return;
+					}
+					String action = intent.getAction();
+					// Device Adapter state changed
+					if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
+						int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,
+								BluetoothAdapter.STATE_OFF);
+						onDeviceStateChanged(state);
+					}
+				}
+			};
+		}
+		this.context.registerReceiver(mReceiver, intentFilterStateChanged);
+		
+	}
+	private void unregisterBroadcast(){
+		// Unregister broadcast listeners
+		if (this.context != null && mReceiver != null){
+			this.context.unregisterReceiver(mReceiver);
+			mReceiver = null;
+		}
+	}
+	private boolean isPaused;
+	public void pause(){
+		// Make sure we're not doing discovery anymore
+		stopScan();
+		isPaused = true;
+	}
+	public void resume(){
+		isPaused = false;
+	}
+//	public static interface Pauseable {
 //		void pause();
 //		void resume();
 //	}
+
 	public enum DeviceState {
 		OFF, TURNING_ON, ON, TURNING_OFF
 	}
-	
+
 	public interface DeviceStateListener {
 		/**
 		 * @param state
@@ -169,44 +217,40 @@ public class BleManager {
 	}
 
 	public boolean isEnabled() {
-		if (!mBluetoothAdapter.isEnabled()) {
-			return false;
+		BluetoothAdapter adapter = getBluetoothAdapter(context);
+		if (adapter != null && adapter.isEnabled()) {
+			return true;
 		}
-		return true;
+		return false;
 	}
 
-	//开启蓝牙
+	// 开启蓝牙
 	public void enable() {
-		if (!mBluetoothAdapter.isEnabled()) {
-			mBluetoothAdapter.enable();
+		BluetoothAdapter adapter = getBluetoothAdapter(context);
+		if (adapter == null) {
+			return;
+		}
+		if (!adapter.isEnabled()) {
+			adapter.enable();
 		} else {
 			onDeviceStateChanged(BluetoothAdapter.STATE_ON);
 		}
 	}
-	//关闭蓝牙
-	public void disable(){
-		if (mBluetoothAdapter.isEnabled()) {
-			mBluetoothAdapter.disable();
+
+	// 关闭蓝牙
+	public void disable() {
+		BluetoothAdapter adapter = getBluetoothAdapter(context);
+		if (adapter == null) {
+			return;
+		}
+		if (adapter.isEnabled()) {
+			adapter.disable();
 		} else {
 			onDeviceStateChanged(BluetoothAdapter.STATE_OFF);
 		}
 	}
-	
-	
 
-	// The BroadcastReceiver that listens for discovered devices and
-	private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
-		@Override
-		public void onReceive(Context context, Intent intent) {
-			String action = intent.getAction();
-			// Device Adapter state changed
-			if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
-				int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,
-						BluetoothAdapter.STATE_OFF);
-				onDeviceStateChanged(state);
-			}
-		}
-	};
+	private BroadcastReceiver mReceiver ;
 
 	public DeviceStateListener getDeviceStateListener() {
 		return deviceStateListener;
@@ -217,28 +261,33 @@ public class BleManager {
 	}
 
 	/**
-	 * Device does not support Ble
+	 * Ble is not available
+	 * 
 	 * @author Wayne
 	 */
-	public static class BleSupportException extends Exception {
-		private static final long serialVersionUID = -5168381347847106511L;
+	public static class BleAvailableException extends Exception {
+		private static final long serialVersionUID = -1795246380456026532L;
+
 		@Override
 		public String getMessage() {
-			return "当前设备不支持BLE";
+			return "当前设备BLE不可用";
 		}
 	}
 
-//查找//////////////////////////////////////////////////////////////////////////////////
+	// 查找//////////////////////////////////////////////////////////////////////////////////
 	// Stops scanning after 10 seconds.
-    private static final long SCAN_PERIOD = 1000*10;
-    private boolean isScanning;
-    private Handler scnaHandler = new Handler();
+	private static final long SCAN_PERIOD = 1000 * 10;
+	private boolean isScanning;
+	private Handler scnaHandler = new Handler();
+
 	public interface ScanListener {
 		/**
 		 * the list of devices changed, update view should be done.
+		 * 
 		 * @param devices
 		 */
 		void onDevicesChanged(Collection<BluetoothDevice> devices);
+
 		void onFinished();
 	}
 
@@ -247,33 +296,39 @@ public class BleManager {
 
 	private BluetoothDevice addDevice(BluetoothDevice device) {
 		if (device != null) {
-			//如果已经存在相同设备（地址相同）则替换,并返回旧设备
+			// 如果已经存在相同设备（地址相同）则替换,并返回旧设备
 			return devices.put(device.getAddress(), device);
 		}
 		return null;
 	}
-	
+
 	// Device scan callback.
-    private BluetoothAdapter.LeScanCallback mLeScanCallback =
-            new BluetoothAdapter.LeScanCallback() {
-        @Override
-        public void onLeScan(final BluetoothDevice device, int rssi, byte[] scanRecord) {
-            addDevice(device);
-            scnaHandler.post(new Runnable() {
+	private BluetoothAdapter.LeScanCallback mLeScanCallback = new BluetoothAdapter.LeScanCallback() {
+		@Override
+		public void onLeScan(final BluetoothDevice device, int rssi,
+				byte[] scanRecord) {
+			addDevice(device);
+			scnaHandler.post(new Runnable() {
 				@Override
 				public void run() {
-					if (scanListener!=null) {
+					if (scanListener != null) {
 						scanListener.onDevicesChanged(devices.values());
 					}
 				}
 			});
-        }
-    };
+		}
+	};
+
 	/**
 	 * scan the nearby devices
+	 * 
 	 * @return
 	 */
 	public void startScan(ScanListener l) {
+		BluetoothAdapter adapter = getBluetoothAdapter(context);
+		if (adapter == null) {
+			return;
+		}
 		if (isScanning) {
 			return;
 		}
@@ -281,23 +336,27 @@ public class BleManager {
 		stopScan();
 		isScanning = true;
 		// Request discover from BluetoothAdapter
-		mBluetoothAdapter.startLeScan(mLeScanCallback);
+		adapter.startLeScan(mLeScanCallback);
 		scnaHandler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-            	stopScan();
-            }
-        }, SCAN_PERIOD);
+			@Override
+			public void run() {
+				stopScan();
+			}
+		}, SCAN_PERIOD);
 	}
 
 	public void stopScan() {
+		BluetoothAdapter adapter = getBluetoothAdapter(context);
+		if (adapter == null) {
+			return;
+		}
 		if (!isScanning) {
 			return;
 		}
 		isScanning = false;
-		mBluetoothAdapter.stopLeScan(mLeScanCallback);
-		if (scanListener!=null) {
-        	scanListener.onFinished();
+		adapter.stopLeScan(mLeScanCallback);
+		if (scanListener != null) {
+			scanListener.onFinished();
 		}
 	}
 
@@ -308,112 +367,243 @@ public class BleManager {
 	public void setDiscoveryListener(ScanListener discoveryListener) {
 		this.scanListener = discoveryListener;
 	}
-	
-//IO//////////////////////////////////////////////////////////////////////////////////
-	public Connection createConnection(){
+
+	// TODO
+	// IO//////////////////////////////////////////////////////////////////////////////////
+	private ArrayList<Connection> connections = new ArrayList<BleManager.Connection>();
+
+	public Connection createConnection() {
 		Connection conn = new Connection();
+		connections.add(conn);
 		return conn;
 	}
+
+	public void removeConnection(Connection conn) {
+		if (conn != null && connections.contains(conn)) {
+			conn.disconnect();
+			connections.remove(conn);
+		}
+	}
+
 	public enum ConnectionState {
 		DISCONNECTED, // 未连接或连接断开
 		CONNECTING, // 正在试图去连接对方或接受连接
 		CONNECTED// 已经连接
 	}
+
 	public interface BluetoothConnectionListener {
 		/**
-		 * @param state 当前状态
+		 * @param state
+		 *            当前状态
 		 */
 		void onConnectionStateChanged(ConnectionState state);
 	}
-	class Connection{
-		private String serverDeviceName;
-	    private String serverDeviceAddress;
 
+	class Connection {
+		private String serverDeviceName;
+		private String serverDeviceAddress;
+		private BluetoothGatt mBluetoothGatt;
 		protected ConnectionState state = ConnectionState.DISCONNECTED;
-		public void disconnect(){
-			
+		private BluetoothGattCallback gattCallback;
+		private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
+			@Override
+			public void onConnectionStateChange(BluetoothGatt gatt, int status,
+					int newState) {
+				if (newState == BluetoothProfile.STATE_CONNECTED) {
+					state = ConnectionState.CONNECTED;
+
+				} else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+					state = ConnectionState.DISCONNECTED;
+				}
+				if (gattCallback != null) {
+					gattCallback
+							.onConnectionStateChange(gatt, status, newState);
+				}
+			}
+
+			@Override
+			public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+				super.onServicesDiscovered(gatt, status);
+				if (gattCallback != null) {
+					gattCallback.onServicesDiscovered(gatt, status);
+				}
+			}
+
+			@Override
+			public void onCharacteristicRead(BluetoothGatt gatt,
+					BluetoothGattCharacteristic characteristic, int status) {
+				super.onCharacteristicRead(gatt, characteristic, status);
+				if (gattCallback != null) {
+					gattCallback.onCharacteristicRead(gatt, characteristic,
+							status);
+				}
+			}
+
+			@Override
+			public void onCharacteristicWrite(BluetoothGatt gatt,
+					BluetoothGattCharacteristic characteristic, int status) {
+				super.onCharacteristicWrite(gatt, characteristic, status);
+				if (gattCallback != null) {
+					gattCallback.onCharacteristicWrite(gatt, characteristic,
+							status);
+				}
+			}
+
+			@Override
+			public void onCharacteristicChanged(BluetoothGatt gatt,
+					BluetoothGattCharacteristic characteristic) {
+				super.onCharacteristicChanged(gatt, characteristic);
+				if (gattCallback != null) {
+					gattCallback.onCharacteristicChanged(gatt, characteristic);
+				}
+			}
+
+			@Override
+			public void onDescriptorRead(BluetoothGatt gatt,
+					BluetoothGattDescriptor descriptor, int status) {
+				super.onDescriptorRead(gatt, descriptor, status);
+				if (gattCallback != null) {
+					gattCallback.onDescriptorRead(gatt, descriptor, status);
+				}
+			}
+
+			@Override
+			public void onDescriptorWrite(BluetoothGatt gatt,
+					BluetoothGattDescriptor descriptor, int status) {
+				super.onDescriptorWrite(gatt, descriptor, status);
+				if (gattCallback != null) {
+					gattCallback.onDescriptorWrite(gatt, descriptor, status);
+				}
+			}
+
+			@Override
+			public void onReliableWriteCompleted(BluetoothGatt gatt, int status) {
+				super.onReliableWriteCompleted(gatt, status);
+				if (gattCallback != null) {
+					gattCallback.onReliableWriteCompleted(gatt, status);
+				}
+			}
+
+			@Override
+			public void onReadRemoteRssi(BluetoothGatt gatt, int rssi,
+					int status) {
+				super.onReadRemoteRssi(gatt, rssi, status);
+				if (gattCallback != null) {
+					gattCallback.onReadRemoteRssi(gatt, rssi, status);
+				}
+			}
+		};
+
+		public void disconnect() {
+			if (mBluetoothGatt != null) {
+				mBluetoothGatt.disconnect();
+				mBluetoothGatt.close();
+				mBluetoothGatt = null;
+			}
 		}
-		public void connect(){
-			
+
+		public boolean connect(BluetoothDevice device) {
+			return connect(device, false);
 		}
-		public void connect(BluetoothDevice device){
+
+		public boolean connect(BluetoothDevice device, boolean autoConnect) {
+			if (device == null) {
+				return false;
+			}
+			return connect(device.getAddress(), false);
+		}
+
+		public boolean connect(String serverDeviceAddress) {
+			return connect(serverDeviceAddress, false);
+		}
+
+		public boolean connect(String serverDeviceAddress, boolean autoConnect) {
+			if (this.serverDeviceAddress != null
+					&& serverDeviceAddress.equals(this.serverDeviceAddress)
+					&& mBluetoothGatt != null) {
+				if (this.state == ConnectionState.CONNECTED) {
+					return true;
+				} else {
+					if (mBluetoothGatt.connect()) {
+						this.state = ConnectionState.CONNECTING;
+						return true;
+					} else {
+						return false;
+					}
+				}
+			}
+			disconnect();
+			this.serverDeviceAddress = serverDeviceAddress;
+
+			BluetoothAdapter adapter = getBluetoothAdapter(context);
+			if (adapter == null) {
+				return false;
+			}
+
+			final BluetoothDevice device = adapter
+					.getRemoteDevice(this.serverDeviceAddress);
+			if (device == null) {
+				return false;
+			}
 			this.serverDeviceName = device.getName();
-			this.serverDeviceAddress = device.getAddress();
+			mBluetoothGatt = device.connectGatt(context, false, mGattCallback);
+			this.state = ConnectionState.CONNECTING;
+			return true;
 		}
-		public void connect(String serverDeviceAddress){
-			this.serverDeviceAddress = serverDeviceAddress;
+
+		public void read() {
+
 		}
-		public void connect(String serverDeviceName,String serverDeviceAddress){
-			this.serverDeviceName = serverDeviceName;
-			this.serverDeviceAddress = serverDeviceAddress;
-		}
-		public void read(){
-			
-		}
-		public void write(String chars){
+
+		public void write(String chars) {
 			write(chars.getBytes());
 		}
+
 		public void write(byte[] data) {
-			if (data==null||data.length==0) {
+			if (data == null || data.length == 0) {
 				return;
 			}
-	        // Synchronize a copy of the ConnectedThread
-	        synchronized (this) {
-	            if (state != ConnectionState.CONNECTED) return;
-	        }
-	        // Perform the write unsynchronized
-	        
-	    }
+			// Synchronize a copy of the ConnectedThread
+			synchronized (this) {
+				if (state != ConnectionState.CONNECTED)
+					return;
+			}
+			// Perform the write unsynchronized
+		}
+
 		public String getServerDeviceName() {
 			return serverDeviceName;
 		}
+
 		public void setServerDeviceName(String serverDeviceName) {
 			this.serverDeviceName = serverDeviceName;
 		}
+
+		public BluetoothGattCallback getGattCallback() {
+			return gattCallback;
+		}
+
+		public void setGattCallback(BluetoothGattCallback gattCallback) {
+			this.gattCallback = gattCallback;
+		}
 	}
-	public static UUID UUID_SERVICE =
-	            UUID.fromString("wayne");
-	public static UUID UUID_C1 =
-			UUID.fromString("green");
-	public void createServer(){
-		BluetoothGattServer server = getBluetoothManager(context).openGattServer(context, new BluetoothGattServerCallback() {
-			@Override
-			public void onConnectionStateChange(BluetoothDevice device,
-					int status, int newState) {
-				super.onConnectionStateChange(device, status, newState);
-			}
 
-			@Override
-			public void onServiceAdded(int status, BluetoothGattService service) {
-				super.onServiceAdded(status, service);
-			}
+	// TODO //////////////////////////////////////////////////////////////////
+	public ArrayList<BluetoothGattServer> gattServers = new ArrayList<BluetoothGattServer>();
 
-			@Override
-			public void onCharacteristicReadRequest(BluetoothDevice device,
-					int requestId, int offset,
-					BluetoothGattCharacteristic characteristic) {
-				super.onCharacteristicReadRequest(device, requestId, offset, characteristic);
-			}
+	public void createServer(BluetoothGattServerCallback callback) {
+		BluetoothGattServer server = getBluetoothManager(context)
+				.openGattServer(context, callback);
+		if (server != null) {
+			gattServers.add(server);
+		}
+	}
 
-			@Override
-			public void onCharacteristicWriteRequest(BluetoothDevice device,
-					int requestId, BluetoothGattCharacteristic characteristic,
-					boolean preparedWrite, boolean responseNeeded, int offset,
-					byte[] value) {
-				super.onCharacteristicWriteRequest(device, requestId, characteristic,
-						preparedWrite, responseNeeded, offset, value);
-			}
+	public ArrayList<Connection> getConnections() {
+		return connections;
+	}
 
-			@Override
-			public void onExecuteWrite(BluetoothDevice device, int requestId,
-					boolean execute) {
-				super.onExecuteWrite(device, requestId, execute);
-			}
-			
-		});
-		BluetoothGattService service = new BluetoothGattService(UUID_SERVICE, BluetoothGattService.SERVICE_TYPE_PRIMARY);
-//		BluetoothGa/ttCharacteristic c = new BluetoothGattCharacteristic(UUID_C1, properties, permissions)
-//		service.addCharacteristic(characteristic)
-		server.addService(service);
+	public void setConnections(ArrayList<Connection> connections) {
+		this.connections = connections;
 	}
 }
