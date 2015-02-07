@@ -45,6 +45,12 @@ public class FriendsFragment extends Fragment {
 				startActivity(new Intent(getActivity(), DeviceScanActivity.class));
 			}
 		});
+		view.findViewById(R.id.createServerBtn).setOnClickListener(new View.OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				startActivity(new Intent(getActivity(), BleServerActivity.class));
+			}
+		});
 		searchBtn = (Button) view.findViewById(R.id.searchBtn);
 		searchBtn.setOnClickListener(new View.OnClickListener() {
 			@Override
@@ -108,8 +114,7 @@ public class FriendsFragment extends Fragment {
 	}
 	private void deviceConnectToServer(BluetoothDevice bd){
 		if(getBluetoothManager()!=null){
-			Toast.makeText(getActivity(), "准备创建连接："+bd, 0).show();
-			
+			startActivity(new Intent(getActivity(), BleConnectionActivity.class));
 		}else{
 			Toast.makeText(getActivity(), "无法连接："+bd, 0).show();
 		}

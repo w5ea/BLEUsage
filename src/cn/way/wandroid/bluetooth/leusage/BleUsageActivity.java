@@ -12,7 +12,7 @@ import cn.way.wandroid.bluetooth.BleManager.DeviceStateListener;
 
 public class BleUsageActivity extends Activity {
 
-	private BleManager bluetoothManager;
+	private BleManager bluetoothManager = null;
 	private FriendsFragment friendsFragment;
 	private DeviceStateListener deviceStateListener = new DeviceStateListener() {
 		@Override
@@ -24,16 +24,21 @@ public class BleUsageActivity extends Activity {
 				break;
 			case ON:
 				getActionBar().setTitle("蓝牙已经开启");
+				FragmentTransaction ft = getFragmentManager().beginTransaction();
 				if (friendsFragment==null) {
-					FragmentTransaction ft = getFragmentManager().beginTransaction();
 					friendsFragment = new FriendsFragment();
 					friendsFragment.setBluetoothManager(bluetoothManager);
-					ft.replace(R.id.bluetooth_page_main_root, friendsFragment);
-					ft.commit();
 				}
+				ft.replace(R.id.bluetooth_page_main_root, friendsFragment);
+				ft.commit();
 				break;
 			case OFF:
 				getActionBar().setTitle("蓝牙已经关闭");
+				if (friendsFragment!=null) {
+					getFragmentManager().beginTransaction()
+					.remove(friendsFragment)
+					.commit();
+				}
 				break;
 			case TURNING_OFF:
 				getActionBar().setTitle("正在关闭蓝牙");
@@ -43,10 +48,11 @@ public class BleUsageActivity extends Activity {
 	};
 	@Override
 	protected void onDestroy() {
+		super.onDestroy();
 		if (bluetoothManager!=null) {
+			bluetoothManager.disable();
 			bluetoothManager.release();
 		}
-		super.onDestroy();
 	}
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -55,7 +61,6 @@ public class BleUsageActivity extends Activity {
 		try {
 			bluetoothManager = BleManager.instance(this);
 			bluetoothManager.setDeviceStateListener(deviceStateListener);
-			bluetoothManager.enable();
 		} catch (BleAvailableException e) {
 			Toaster.instance(this).setup(e.toString()).show();
 		}
@@ -63,11 +68,15 @@ public class BleUsageActivity extends Activity {
 	@Override
 	protected void onStop() {
 		super.onStop();
-		bluetoothManager.pause();
+		if (bluetoothManager!=null) {
+			bluetoothManager.pause();
+		}
 	}
 	@Override
 	protected void onResume() {
 		super.onResume();
-		bluetoothManager.resume();
+		if (bluetoothManager!=null) {
+			bluetoothManager.enable();
+		}
 	}
 }

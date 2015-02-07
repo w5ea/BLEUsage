@@ -23,7 +23,7 @@
     android:versionName="1.0">
 
     <uses-sdk
-        android:minSdkVersion="18"
+        android:minSdkVersion="21"
         android:targetSdkVersion="21" />
     
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true"/>
@@ -45,6 +45,8 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <activity android:name="cn.way.wandroid.bluetooth.leusage.BleConnectionActivity"></activity>
+        <activity android:name="cn.way.wandroid.bluetooth.leusage.BleServerActivity"></activity>
     </application>
 
 </manifest>

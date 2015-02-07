@@ -1,5 +1,6 @@
 package cn.way.wandroid.bluetooth.leusage;
 
+import cn.way.bleusage.R;
 import android.app.Activity;
 import android.os.Bundle;
 import android.widget.Toast;
@@ -13,6 +14,7 @@ public class BleConnectionActivity extends Activity {
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		setContentView(R.layout.page_connection);
 		String deviceAddress = getIntent().getStringExtra(EXTRA_DEVICE_ADDRESS);
 		if (deviceAddress!=null) {
 			

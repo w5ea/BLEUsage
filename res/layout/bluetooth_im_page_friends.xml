@@ -17,6 +17,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="  查找    "/>
+        <Button android:id="@+id/createServerBtn" 
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="  创建服务器    "/>
         <Button android:id="@+id/demoPage" 
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

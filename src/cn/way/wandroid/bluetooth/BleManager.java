@@ -3,6 +3,7 @@ package cn.way.wandroid.bluetooth;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Hashtable;
+import java.util.UUID;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
@@ -15,12 +16,17 @@ import android.bluetooth.BluetoothGattServer;
 import android.bluetooth.BluetoothGattServerCallback;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
+import android.bluetooth.le.AdvertiseCallback;
+import android.bluetooth.le.AdvertiseData;
+import android.bluetooth.le.AdvertiseSettings;
+import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Handler;
+import android.os.ParcelUuid;
 
 /**
  * 1.add permissions. <uses-permission
@@ -45,7 +51,7 @@ public class BleManager {
 			return null;
 		}
 		if (manager == null) {
-			manager = new BleManager(context.getApplicationContext());
+			manager = new BleManager(context);
 		}
 		return manager;
 	}
@@ -124,7 +130,9 @@ public class BleManager {
 
 	public void release() {
 		scanListener = null;
+		stopScan();
 		unregisterBroadcast();
+		manager = null;
 	}
 
 	/**
@@ -132,21 +140,24 @@ public class BleManager {
 	 */
 	private BleManager(Context context) {
 		super();
-		this.context = context;
+		this.context = context.getApplicationContext();
+		this.isPaused = false;
 		// 监听蓝牙设置的开关状态
 		registerBroadcast();
 	}
-	private IntentFilter intentFilterStateChanged ;
-	private void registerBroadcast(){
-		if (this.context==null) {
+
+	private IntentFilter intentFilterStateChanged;
+
+	private void registerBroadcast() {
+		if (this.context == null) {
 			return;
 		}
-		
+
 		if (intentFilterStateChanged == null) {
 			intentFilterStateChanged = new IntentFilter(
 					BluetoothAdapter.ACTION_STATE_CHANGED);
 		}
-		if (mReceiver==null) {
+		if (mReceiver == null) {
 			mReceiver = new BroadcastReceiver() {
 				@Override
 				public void onReceive(Context context, Intent intent) {
@@ -156,7 +167,8 @@ public class BleManager {
 					String action = intent.getAction();
 					// Device Adapter state changed
 					if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
-						int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,
+						int state = intent.getIntExtra(
+								BluetoothAdapter.EXTRA_STATE,
 								BluetoothAdapter.STATE_OFF);
 						onDeviceStateChanged(state);
 					}
@@ -164,28 +176,33 @@ public class BleManager {
 			};
 		}
 		this.context.registerReceiver(mReceiver, intentFilterStateChanged);
-		
+
 	}
-	private void unregisterBroadcast(){
+
+	private void unregisterBroadcast() {
 		// Unregister broadcast listeners
-		if (this.context != null && mReceiver != null){
+		if (this.context != null && mReceiver != null) {
 			this.context.unregisterReceiver(mReceiver);
 			mReceiver = null;
 		}
 	}
+
 	private boolean isPaused;
-	public void pause(){
+
+	public void pause() {
 		// Make sure we're not doing discovery anymore
 		stopScan();
 		isPaused = true;
 	}
-	public void resume(){
+
+	public void resume() {
 		isPaused = false;
 	}
-//	public static interface Pauseable {
-//		void pause();
-//		void resume();
-//	}
+
+	// public static interface Pauseable {
+	// void pause();
+	// void resume();
+	// }
 
 	public enum DeviceState {
 		OFF, TURNING_ON, ON, TURNING_OFF
@@ -193,6 +210,8 @@ public class BleManager {
 
 	public interface DeviceStateListener {
 		/**
+		 * 如果执行bleManager.pause()方法，回调将不会执行
+		 * 
 		 * @param state
 		 *            {@link #STATE_OFF}, {@link #STATE_TURNING_ON},
 		 *            {@link #STATE_ON}, {@link #STATE_TURNING_OFF},
@@ -230,6 +249,7 @@ public class BleManager {
 		if (adapter == null) {
 			return;
 		}
+		resume();
 		if (!adapter.isEnabled()) {
 			adapter.enable();
 		} else {
@@ -250,7 +270,7 @@ public class BleManager {
 		}
 	}
 
-	private BroadcastReceiver mReceiver ;
+	private BroadcastReceiver mReceiver;
 
 	public DeviceStateListener getDeviceStateListener() {
 		return deviceStateListener;
@@ -492,6 +512,15 @@ public class BleManager {
 					gattCallback.onReadRemoteRssi(gatt, rssi, status);
 				}
 			}
+
+			@Override
+			public void onMtuChanged(BluetoothGatt gatt, int mtu, int status) {
+				super.onMtuChanged(gatt, mtu, status);
+				if (gattCallback != null) {
+					gattCallback.onMtuChanged(gatt, mtu, status);
+				}
+			}
+
 		};
 
 		public void disconnect() {
@@ -589,6 +618,27 @@ public class BleManager {
 	}
 
 	// TODO //////////////////////////////////////////////////////////////////
+	public void testServer(String serviceUuid) {
+		BluetoothLeAdvertiser advertiser = getBluetoothAdapter(context)
+				.getBluetoothLeAdvertiser();
+		if (advertiser != null) {
+			AdvertiseData data = new AdvertiseData.Builder().addServiceUuid(
+					ParcelUuid.fromString(serviceUuid)).build();
+
+			AdvertiseSettings settings = new AdvertiseSettings.Builder()
+					.setConnectable(true).build();
+
+			advertiser.startAdvertising(settings, data,
+					new AdvertiseCallback() {
+						@Override
+						public void onStartSuccess(
+								AdvertiseSettings settingsInEffect) {
+							super.onStartSuccess(settingsInEffect);
+						}
+					});
+		}
+	}
+
 	public ArrayList<BluetoothGattServer> gattServers = new ArrayList<BluetoothGattServer>();
 
 	public void createServer(BluetoothGattServerCallback callback) {
