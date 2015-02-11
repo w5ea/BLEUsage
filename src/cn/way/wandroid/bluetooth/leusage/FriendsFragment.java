@@ -8,6 +8,7 @@ import android.app.Fragment;
 import android.bluetooth.BluetoothDevice;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -45,17 +46,18 @@ public class FriendsFragment extends Fragment {
 				startActivity(new Intent(getActivity(), DeviceScanActivity.class));
 			}
 		});
-		view.findViewById(R.id.createServerBtn).setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				startActivity(new Intent(getActivity(), BleServerActivity.class));
-			}
-		});
+		view.findViewById(R.id.createServerBtn).setVisibility(View.GONE);
+//		setOnClickListener(new View.OnClickListener() {
+//			@Override
+//			public void onClick(View v) {
+//				startActivity(new Intent(getActivity(), BleServerActivity.class));
+//			}
+//		});
 		searchBtn = (Button) view.findViewById(R.id.searchBtn);
 		searchBtn.setOnClickListener(new View.OnClickListener() {
 			@Override
 			public void onClick(View v) {
-				doDescovery();
+				doScan();
 			}
 		});
 		
@@ -111,22 +113,26 @@ public class FriendsFragment extends Fragment {
 	@Override
 	public void onResume() {
 		super.onResume();
+		Log.w("test", "uuid: " + BleConnectionActivity.getUUID());
+		doScan();
 	}
 	private void deviceConnectToServer(BluetoothDevice bd){
 		if(getBluetoothManager()!=null){
-			startActivity(new Intent(getActivity(), BleConnectionActivity.class));
+			Intent intent = new Intent(getActivity(), BleConnectionActivity.class);
+			intent.putExtra(BleConnectionActivity.EXTRA_DEVICE_ADDRESS, bd.getAddress());
+			startActivity(intent);
 		}else{
 			Toast.makeText(getActivity(), "无法连接："+bd, 0).show();
 		}
 	}
 
-	private void doDescovery(){
+	private void doScan(){
 		if (!getBluetoothManager().isEnabled()) {
 			getBluetoothManager().setDeviceStateListener(new DeviceStateListener() {
 				@Override
 				public void onStateChanged(DeviceState state) {
 					if (state == DeviceState.ON) {
-						doDescovery();
+						doScan();
 					}
 					Toaster.instance(getActivity()).setup("state : "+state).show();
 					if (state == DeviceState.OFF) {
@@ -137,8 +143,10 @@ public class FriendsFragment extends Fragment {
 			getBluetoothManager().enable();
 			return;
 		}
-		if (getBluetoothManager()!=null) {
+		if (getBluetoothManager()!=null&&!getBluetoothManager().isScanning()) {
 			searchBtn.setText("正在查找...");
+			nearbyDevices.clear();
+			adapterFound.notifyDataSetChanged();
 			getBluetoothManager().startScan(new ScanListener() {
 				@Override
 				public void onFinished() {

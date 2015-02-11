@@ -15,7 +15,7 @@
  limitations under the License.
 -->
 <resources>
-    <string name="app_name">BluetoothLeGatt</string>
+    <string name="app_name">BLE</string>
     <string name="intro_message">
         <![CDATA[
         

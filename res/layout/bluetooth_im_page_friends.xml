@@ -24,7 +24,8 @@
         <Button android:id="@+id/demoPage" 
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="  DEMO    "/>
+            android:text="  DEMO    "
+            android:visibility="gone"/>
     </LinearLayout>
 
     <ListView android:id="@+id/im_discoveries_list"
