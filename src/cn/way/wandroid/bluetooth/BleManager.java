@@ -130,6 +130,7 @@ public class BleManager {
 
 	public void release() {
 		scanListener = null;
+		deviceStateListener = null;
 		stopScan();
 		unregisterBroadcast();
 		manager = null;

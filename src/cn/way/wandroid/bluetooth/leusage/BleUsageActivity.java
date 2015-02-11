@@ -46,6 +46,7 @@ public class BleUsageActivity extends Activity {
 			}
 		}
 	};
+	
 	@Override
 	protected void onDestroy() {
 		super.onDestroy();
@@ -70,6 +71,7 @@ public class BleUsageActivity extends Activity {
 		super.onStop();
 		if (bluetoothManager!=null) {
 			bluetoothManager.pause();
+			bluetoothManager.release();
 		}
 	}
 	@Override
