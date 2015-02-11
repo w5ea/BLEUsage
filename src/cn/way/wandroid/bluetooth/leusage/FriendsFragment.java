@@ -136,6 +136,7 @@ public class FriendsFragment extends Fragment {
 					}
 					Toaster.instance(getActivity()).setup("state : "+state).show();
 					if (state == DeviceState.OFF) {
+						getBluetoothManager().stopScan();
 						searchBtn.setText("查找");
 					}
 				}

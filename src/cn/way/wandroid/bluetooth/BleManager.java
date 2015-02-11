@@ -303,7 +303,7 @@ public class BleManager {
 		return isScanning;
 	}
 
-	private Handler scnaHandler = new Handler();
+	private Handler scanHandler = new Handler();
 
 	public interface ScanListener {
 		/**
@@ -333,7 +333,7 @@ public class BleManager {
 		public void onLeScan(final BluetoothDevice device, int rssi,
 				byte[] scanRecord) {
 			addDevice(device);
-			scnaHandler.post(new Runnable() {
+			scanHandler.post(new Runnable() {
 				@Override
 				public void run() {
 					if (scanListener != null) {
@@ -344,6 +344,7 @@ public class BleManager {
 		}
 	};
 
+	private Runnable stopScanCallback ;
 	/**
 	 * scan the nearby devices
 	 * 
@@ -362,15 +363,19 @@ public class BleManager {
 		isScanning = true;
 		// Request discover from BluetoothAdapter
 		adapter.startLeScan(mLeScanCallback);
-		scnaHandler.postDelayed(new Runnable() {
+		stopScanCallback = new Runnable() {
 			@Override
 			public void run() {
 				stopScan();
 			}
-		}, SCAN_PERIOD);
+		};
+		scanHandler.postDelayed(stopScanCallback, SCAN_PERIOD);
 	}
 
 	public void stopScan() {
+		if (stopScanCallback!=null) {
+			scanHandler.removeCallbacks(stopScanCallback);
+		}
 		BluetoothAdapter adapter = getBluetoothAdapter(context);
 		if (adapter == null) {
 			return;
